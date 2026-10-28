@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BasketCoach AI</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            orange: '#FF6B00',
+                            dark: '#0B0D12',
+                            card: '#12151E',
+                            cardBorder: '#1F2430',
+                            bubble: '#161922'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome para ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Arquivo CSS Customizado -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="flex flex-col h-screen justify-between overflow-hidden text-zinc-100">
+
+    <!-- Top Bar -->
+    <header class="flex items-center justify-between px-8 py-4 border-b border-brand-cardBorder/50 bg-[#0B0D12]/90 backdrop-blur z-20">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-brand-orange flex items-center justify-center text-black font-bold text-lg shadow-lg shadow-brand-orange/20">
+                <i class="fa-solid fa-basketball"></i>
+            </div>
+            <div>
+                <div class="font-black text-lg tracking-wide text-white leading-tight">BasketCoach <span class="text-brand-orange">AI</span></div>
+                <div class="text-[10px] tracking-widest text-zinc-400 font-semibold uppercase">COACH ASSISTENTE</div>
+            </div>
+        </div>
+        
+        <!-- Status Online -->
+        <div class="flex items-center space-x-2 bg-zinc-900/80 border border-zinc-800 px-3 py-1 rounded-full text-[11px] font-medium text-zinc-300">
+            <span class="w-2 h-2 rounded-full bg-brand-orange animate-pulse"></span>
+            <span>Online</span>
+        </div>
+    </header>
+
+    <!-- Main Container com a Quadra no Fundo -->
+    <main id="main-container" class="flex-1 overflow-y-auto flex flex-col items-center p-4 relative court-bg">
+        
+        <!-- Badge de Sessão Centralizado -->
+        <div class="flex flex-col items-center mt-2 mb-6 z-10">
+            <div class="bg-zinc-900/90 border border-zinc-800/80 text-[10px] tracking-wider text-zinc-400 font-bold px-4 py-1.5 rounded-full uppercase shadow-lg">
+                COACH ESPECIALISTA IA • HOJE • SESSÃO DE ARREMESSO
+            </div>
+            <p class="text-[12px] text-zinc-400 mt-2 font-medium">Análise técnica e ajustes de precisão</p>
+        </div>
+
+        <!-- Container de Mensagens do Chat -->
+        <div id="chat-messages" class="w-full max-w-3xl space-y-6 pb-6 z-10 flex flex-col"></div>
+    </main>
+
+    <!-- Footer / Area de Input -->
+    <footer class="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 z-20">
+        <div class="relative bg-[#12151E] border border-[#1F2430] rounded-2xl shadow-2xl focus-within:border-brand-orange/70 transition-all p-2 flex items-center">
+            <textarea id="user-input" rows="1" placeholder="Digite sua mensagem..." class="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm px-4 py-2 focus:outline-none resize-none max-h-32" onkeydown="handleKeyPress(event)"></textarea>
+            <button onclick="sendMessage()" id="send-btn" class="w-10 h-10 rounded-xl bg-brand-orange text-black flex items-center justify-center hover:opacity-90 transition shrink-0 ml-2 font-bold shadow-md shadow-brand-orange/20">
+                <i class="fa-solid fa-arrow-up text-sm"></i>
+            </button>
+        </div>
+        <div class="flex items-center justify-between px-2 mt-2 text-[11px] text-zinc-500">
+            <span>Pressione Enter para enviar • Shift + Enter para quebra de linha</span>
+            <span class="flex items-center space-x-1 font-semibold text-zinc-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-brand-orange"></span>
+                <span>MOTOR TÁTICO CONECTADO</span>
+            </span>
+        </div>
+    </footer>
+
+    <!-- Arquivo JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
