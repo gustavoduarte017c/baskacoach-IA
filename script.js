@@ -1,17 +1,212 @@
 // =========================================================================
-// CONFIGURAÇÕES DA API AZURE OPENAI (PREENCHA COM SEUS DADOS)
+// CONFIGURAÇÃO DO BOT E VARIÁVEIS DE ESTADO
 // =========================================================================
-const AZURE_ENDPOINT = "https://baskacoach-ia.openai.azure.com/openai/deployments/gpt-4.1-mini/chat/completions?api-version=2024-02-15-preview";
-const AZURE_API_KEY = "";
-const MODEL_NAME = "gpt-4.1-mini";
+// AVISO DE SEGURANÇA:
+// Como esta aplicação executa diretamente no navegador (cliente frontend),
+// qualquer chave de API armazenada no localStorage ou carregada pelo frontend
+// não é estritamente secreta e pode ser inspecionada por qualquer usuário com
+// acesso às ferramentas de desenvolvedor (DevTools).
+// Para ambientes de produção reais, recomenda-se sempre utilizar um backend
+// intermediário seguro (Proxy / BFF) que guarde a chave no lado do servidor.
+// Esta implementação atual atende a fins didáticos, locais e de desenvolvimento.
 // =========================================================================
 
+let azureConfig = {
+    apiKey: "",
+    endpoint: "",
+    model: ""
+};
+
+// Histórico inicial de conversa com a diretriz do assistente
 let conversationHistory = [
     {
         role: "system",
         content: "Você é o BasketCoach AI, um treinador de basquete implacável, motivador e especialista em alta performance. Fale apenas sobre basquete, estratégias de quadra, mentalidade de jogo e superação física. ATENÇÃO: NUNCA utilize formatação Markdown nas suas respostas (sem asteriscos para negrito, sem hashtags para títulos, sem listas com marcadores em markdown). Escreva tudo em texto puro, de forma direta e corrida."
     }
 ];
+
+// =========================================================================
+// CARREGAMENTO E GERENCIAMENTO DE CONFIGURAÇÕES
+// Ordem de prioridade:
+// 1º - LocalStorage (azureConfig)
+// 2º - env.json
+// 3º - Nenhuma configuração (abre modal para preenchimento manual)
+// =========================================================================
+
+/**
+ * Valida se um objeto de configuração possui os 3 campos preenchidos e válidos.
+ */
+function isConfigValid(cfg) {
+    if (!cfg || typeof cfg !== 'object') return false;
+    const apiKey = (cfg.apiKey || '').trim();
+    const endpoint = (cfg.endpoint || '').trim();
+    const model = (cfg.model || '').trim();
+
+    const placeholders = ['SUA_CHAVE_API', 'SEU_ENDPOINT', 'SEU_MODELO'];
+    if (!apiKey || placeholders.includes(apiKey)) return false;
+    if (!endpoint || placeholders.includes(endpoint)) return false;
+    if (!model || placeholders.includes(model)) return false;
+
+    return true;
+}
+
+/**
+ * Carrega o arquivo env.json via fetch tratando erros de requisição ou JSON inválido.
+ */
+async function fetchEnvJson() {
+    try {
+        const response = await fetch('env.json', { cache: 'no-store' });
+        if (!response.ok) {
+            console.warn(`[Config] Não foi possível obter env.json (Status: ${response.status})`);
+            return null;
+        }
+        const data = await response.json();
+        return data;
+    } catch (err) {
+        console.warn("[Config] Arquivo env.json inexistente ou com formato JSON inválido:", err);
+        return null;
+    }
+}
+
+/**
+ * Função principal de carregamento das configurações conforme a ordem de prioridade.
+ */
+async function loadConfig() {
+    // 1º — Prioridade: LocalStorage
+    try {
+        const stored = localStorage.getItem("azureConfig");
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (isConfigValid(parsed)) {
+                azureConfig = {
+                    apiKey: parsed.apiKey.trim(),
+                    endpoint: parsed.endpoint.trim(),
+                    model: parsed.model.trim()
+                };
+                populateModalFields(azureConfig);
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn("[Config] Erro ao ler azureConfig do localStorage:", e);
+    }
+
+    // 2º — Prioridade: env.json
+    const envData = await fetchEnvJson();
+    if (envData && isConfigValid(envData)) {
+        azureConfig = {
+            apiKey: envData.apiKey.trim(),
+            endpoint: envData.endpoint.trim(),
+            model: envData.model.trim()
+        };
+        populateModalFields(azureConfig);
+        try {
+            localStorage.setItem("azureConfig", JSON.stringify(azureConfig));
+        } catch (e) {
+            console.warn("[Config] Não foi possível salvar env.json no localStorage:", e);
+        }
+        return;
+    }
+
+    // 3º — Nenhuma configuração válida encontrada
+    // Preenche com o que existir parcialmente (ou vazio) no modal e abre o modal para o usuário
+    if (envData && typeof envData === 'object') {
+        populateModalFields(envData);
+    }
+    openConfigModal("Por favor, configure sua Chave de API, Endpoint e Modelo para iniciar.");
+}
+
+/**
+ * Preenche os inputs do modal com os dados fornecidos.
+ */
+function populateModalFields(cfg) {
+    const keyInput = document.getElementById('modal-api-key');
+    const endpointInput = document.getElementById('modal-endpoint');
+    const modelInput = document.getElementById('modal-model');
+
+    if (keyInput && cfg.apiKey) keyInput.value = cfg.apiKey;
+    if (endpointInput && cfg.endpoint) endpointInput.value = cfg.endpoint;
+    if (modelInput && cfg.model) modelInput.value = cfg.model;
+}
+
+// =========================================================================
+// CONTROLE DO MODAL DE CONFIGURAÇÕES
+// =========================================================================
+
+function openConfigModal(initialMessage = "") {
+    const modal = document.getElementById('config-modal');
+    const feedback = document.getElementById('modal-feedback');
+    if (modal) modal.classList.remove('hidden');
+
+    if (feedback) {
+        if (initialMessage) {
+            feedback.textContent = initialMessage;
+            feedback.className = "text-xs font-medium py-1 text-brand-orange block";
+        } else {
+            feedback.textContent = "";
+            feedback.className = "text-xs font-medium py-1 hidden";
+        }
+    }
+}
+
+function closeConfigModal() {
+    const modal = document.getElementById('config-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Manipula a submissão e salvamento das configurações pelo modal.
+ */
+function handleSaveConfig(event) {
+    if (event) event.preventDefault();
+
+    const apiKey = document.getElementById('modal-api-key').value.trim();
+    const endpoint = document.getElementById('modal-endpoint').value.trim();
+    const model = document.getElementById('modal-model').value.trim();
+    const feedback = document.getElementById('modal-feedback');
+
+    // Validação de campos obrigatórios
+    if (!apiKey || !endpoint || !model) {
+        if (feedback) {
+            feedback.textContent = "Todos os campos são obrigatórios.";
+            feedback.className = "text-xs font-medium py-1 text-red-400 block";
+        }
+        return;
+    }
+
+    // Validação básica do endpoint para evitar requisições malformadas
+    if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
+        if (feedback) {
+            feedback.textContent = "Endpoint inválido. Ele deve iniciar com https:// ou http://";
+            feedback.className = "text-xs font-medium py-1 text-red-400 block";
+        }
+        return;
+    }
+
+    const newConfig = { apiKey, endpoint, model };
+
+    try {
+        localStorage.setItem("azureConfig", JSON.stringify(newConfig));
+    } catch (e) {
+        console.warn("[Config] Falha ao persistir no localStorage:", e);
+    }
+
+    azureConfig = newConfig;
+
+    if (feedback) {
+        feedback.textContent = "Configurações salvas com sucesso!";
+        feedback.className = "text-xs font-medium py-1 text-green-400 block";
+    }
+
+    setTimeout(() => {
+        closeConfigModal();
+        appendAssistantMessage("Configurações salvas com sucesso! Pronto para treinar na quadra.", getCurrentTime());
+    }, 700);
+}
+
+// =========================================================================
+// FUNÇÕES UTILITÁRIAS E INTERFACE DE MENSAGENS
+// =========================================================================
 
 function getCurrentTime() {
     const now = new Date();
@@ -27,19 +222,24 @@ function handleKeyPress(e) {
     }
 }
 
+// =========================================================================
+// ENVIO DE MENSAGENS E INTEGRAÇÃO AZURE OPENAI
+// =========================================================================
+
 async function sendMessage() {
     const inputField = document.getElementById('user-input');
     const text = inputField.value.trim();
     if (!text) return;
 
-    if (!AZURE_ENDPOINT || AZURE_ENDPOINT.includes("SEU-RECURSO") || !AZURE_API_KEY || AZURE_API_KEY.includes("SUA_CHAVE")) {
-        alert("Por favor, edite o arquivo 'script.js' e preencha as variáveis AZURE_ENDPOINT e AZURE_API_KEY no topo.");
+    // Garante que as configurações estejam preenchidas antes de prosseguir
+    if (!isConfigValid(azureConfig)) {
+        openConfigModal("Por favor, preencha as configurações da API antes de enviar uma mensagem.");
         return;
     }
 
     const timeStr = getCurrentTime();
 
-    // Adiciona mensagem do usuário
+    // Adiciona mensagem do usuário na tela
     appendUserMessage(text, timeStr);
     conversationHistory.push({ role: 'user', content: text });
     inputField.value = '';
@@ -49,12 +249,12 @@ async function sendMessage() {
     appendLoadingMessage(loadingId);
 
     try {
-        const response = await fetch(AZURE_ENDPOINT, {
+        const response = await fetch(azureConfig.endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${AZURE_API_KEY}`,
-                'api-key': AZURE_API_KEY
+                'Authorization': `Bearer ${azureConfig.apiKey}`,
+                'api-key': azureConfig.apiKey
             },
             body: JSON.stringify({
                 messages: conversationHistory,
@@ -64,7 +264,7 @@ async function sendMessage() {
                 frequency_penalty: 0,
                 presence_penalty: 0,
                 stop: [],
-                model: MODEL_NAME
+                model: azureConfig.model
             })
         });
 
@@ -94,7 +294,7 @@ async function sendMessage() {
     }
 }
 
-// Balão de Mensagem do Usuário (Laranja vivo conforme a imagem)
+// Balão de Mensagem do Usuário
 function appendUserMessage(text, time) {
     const chatContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
@@ -117,7 +317,7 @@ function appendUserMessage(text, time) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// Balão de Mensagem da IA (Escuro com cabeçalho conforme a imagem)
+// Balão de Mensagem da IA
 function appendAssistantMessage(text, time, isError = false) {
     const chatContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
@@ -188,3 +388,6 @@ function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
+// Inicializa o carregamento das configurações ao carregar a página
+window.addEventListener('DOMContentLoaded', loadConfig);
