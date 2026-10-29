@@ -11,11 +11,22 @@ A aplicação foi projetada com um design moderno em modo escuro total (`#000000
 * **Especialização Estrita (Apenas Basquete):** A inteligência artificial é configurada com um perfil rigoroso para recusar qualquer assunto fora do universo do basquete, mantendo o foco total no desempenho do atleta.
 * **Perfil de Treinador Implacável:** Comportamento focado em alta performance, disciplina e superação física/mental.
 * **Sem Markdown:** Respostas limpas em texto puro, sem formatações indesejadas (como asteriscos ou hashtags), proporcionando uma leitura fluida e natural no chat.
-* **Interface Estilizada (Dark Mode):** 
-  * Fundo totalmente preto (`#000000`).
-  * Detalhes em laranja vibrante (`#FF6B00`).
-  * Fundo de quadra tática vetorial estilizado.
-  * Horários e indicadores de envio/status nas mensagens.
+* **Barra Lateral com Histórico de Conversas (Pranchetas):**
+  * Fundo laranja oficial (`#FF6B00`) com tipografia preta em alto contraste.
+  * Botão de **Novo Chat** com formato estilizado de **prancheta tática de basquete** e tooltip interativo.
+  * Persistência completa no `localStorage` sob a chave `basketcoach_conversations`.
+  * Estados visuais para conversa ativa, hover e opção de exclusão.
+* **Tela Inicial de Alta Performance ("ELEVE SEU JOGO"):**
+  * Apresentação profissional e motivadora com título impactante e proposta esportiva.
+  * Cards interativos de atalho tático (arremessos de 3 pontos, dribles sob pressão, finalizações e plano semanal personalizado).
+  * Transição suave: a tela dá lugar ao fluxo de mensagens assim que a conversa se inicia.
+* **Área de Conversação Expandida:**
+  * Layout flexível e ampliado para melhor aproveitamento horizontal (`max-w-5xl`).
+  * Três zonas de interface claramente definidas: barra lateral, painel central e barra de controles superiores.
+* **Minigame Interativo "Desafio do Arremesso":**
+  * Botão discreto em formato de controle de videogame (`fa-gamepad`) no cabeçalho com tooltip "Jogar basquete".
+  * Modal interativo com motor físico em HTML5 Canvas: mira elástica (arrastar e soltar), gravidade, tabelas de acrílico e aro.
+  * Sistema completo de 10 arremessos por rodada, 2 pontos por cesta, feedback "CESTA! +2", tela de fim de jogo com estatísticas de aproveitamento e botão para jogar novamente.
 * **Integração com Azure OpenAI:** Suporte completo aos parâmetros de requisição (`max_completion_tokens`, `temperature`, `model`, etc.) e tratamento robusto de erros.
 * **Gerenciamento Dinâmico de Credenciais:** Configuração de credenciais via arquivo `env.json` ou diretamente pela interface através de modal interativo.
 
@@ -57,19 +68,12 @@ O chatbot segue a seguinte hierarquia ao inicializar:
 3. **3º — Nenhuma configuração (Manual):** Se o `env.json` não existir ou estiver vazio/inválido e não houver dados salvos no `localStorage`, o modal de configurações será aberto automaticamente para que o usuário informe os dados necessários.
 
 ### 4. Armazenamento Local
-As credenciais definidas pelo usuário ou carregadas do `env.json` são salvas no `localStorage` do navegador sob a chave:
-```javascript
-localStorage.setItem("azureConfig", JSON.stringify(config));
-```
+As credenciais e as conversas salvas ficam armazenadas no `localStorage` do navegador:
+* `azureConfig`: Guarda os parâmetros de conexão com a API.
+* `basketcoach_conversations`: Guarda a lista de pranchetas/sessões e seus respectivos históricos de mensagens.
 
 ### 5. Ciclo de Inicialização
-Ao carregar a página (`DOMContentLoaded`), a aplicação executa a função assíncrona `loadConfig()`, garantindo que as configurações estejam prontas antes de qualquer tentativa de envio de mensagens para a IA. Se o usuário tentar enviar uma mensagem antes de configurar a API, o modal de configurações será acionado imediatamente.
-
-### 6. Tratamento de Erros
-O sistema possui tratamento robusto para falhas operacionais:
-* **`env.json` inexistente ou inválido:** O erro de carregamento ou parsing é interceptado sem travar a interface; o sistema passa para o modo de configuração manual.
-* **Configurações incompletas:** O envio de mensagens é bloqueado até que todos os três campos estejam válidos. No modal, é exibido aviso de campos obrigatórios.
-* **Endpoint ou URL inválidos:** É feita validação de formato no preenchimento e exibição amigável do erro caso a requisição HTTP falhe (exibindo o status HTTP e a resposta de erro retornada pelo Azure OpenAI no próprio balão do assistente).
+Ao carregar a página (`DOMContentLoaded`), a aplicação executa a função assíncrona `loadConfig()` e restaura o histórico via `loadConversationsFromStorage()`, garantindo que as configurações e as pranchetas estejam prontas antes de qualquer tentativa de envio de mensagens para a IA.
 
 ---
 
@@ -79,7 +83,7 @@ O sistema possui tratamento robusto para falhas operacionais:
 > **Importante para Ambientes de Produção:**
 > Como este chatbot é executado diretamente no navegador do usuário (lado do cliente / frontend), qualquer chave de API inserida, armazenada em `localStorage` ou transmitida via JavaScript **não é confidencial** e pode ser visualizada inspecionando o navegador (DevTools / Network / Application).
 > 
-> Esta arquitetura destina-se a fins didáticos, prototipagem e desenvolvimento local. Para colocar a aplicação em produção aberta a terceiros, **recomenda-se implementar um backend intermediário (BFF/Proxy)** onde as chaves da API permaneçam protegidas em variáveis de ambiente seguras no servidor.
+> Esta arquitetura destina-se a fins didáticos, prototipagem e desenvolvimento local. Para colocar a aplicação em produção aberta a terceiros, **recomenda-se implementar um backend intermediário (BFF/Proxy)** onde as chaves da API permaneçam protegidas em variáveis de ambiente seguras no servidor. O arquivo `env.json` está devidamente listado no `.gitignore` para prevenir commits acidentais de credenciais reais.
 
 ---
 
@@ -88,9 +92,10 @@ O sistema possui tratamento robusto para falhas operacionais:
 ```text
 basketcoach-ai/
 │
-├── index.html       # Estrutura HTML da interface, layout do chat e modal de configurações
-├── styles.css       # Estilos customizados, tema escuro e fundo de quadra tática
-├── script.js        # Lógica de integração com Azure OpenAI, prioridade de credenciais e histórico
-├── env.json         # Arquivo de configuração local das credenciais da API Azure OpenAI
-└── README.md        # Documentação completa do projeto, guia de uso e especificações
+├── index.html       # Interface visual: sidebar de pranchetas, tela inicial "ELEVE SEU JOGO", modais
+├── styles.css       # Estilos customizados, tema escuro, scrollbars e suporte ao canvas
+├── script.js        # Lógica central: histórico persistente, chamadas à API, canvas physics do minigame
+├── env.json         # Arquivo de configuração local das credenciais da API Azure OpenAI (ignorado no Git)
+├── .gitignore       # Proteção contra vazamento de credenciais locais
+└── README.md        # Documentação completa do projeto, especificações e guia de uso
 ```

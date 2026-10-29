@@ -29,69 +29,210 @@
     <!-- Arquivo CSS Customizado -->
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="flex flex-col h-screen justify-between overflow-hidden text-zinc-100">
+<body class="flex h-screen overflow-hidden text-zinc-100 bg-[#0B0D12]">
 
-    <!-- Top Bar -->
-    <header class="flex items-center justify-between px-8 py-4 border-b border-brand-cardBorder/50 bg-[#0B0D12]/90 backdrop-blur z-20">
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-brand-orange flex items-center justify-center text-black font-bold text-lg shadow-lg shadow-brand-orange/20">
-                <i class="fa-solid fa-basketball"></i>
-            </div>
-            <div>
-                <div class="font-black text-lg tracking-wide text-white leading-tight">BasketCoach <span class="text-brand-orange">AI</span></div>
-                <div class="text-[10px] tracking-widest text-zinc-400 font-semibold uppercase">COACH ASSISTENTE</div>
-            </div>
-        </div>
+    <!-- ============================================================== -->
+    <!-- BARRA LATERAL (HISTÓRICO DE CONVERSAS) - Laranja com texto preto -->
+    <!-- ============================================================== -->
+    <aside id="sidebar" class="w-64 md:w-72 bg-[#FF6B00] text-black flex flex-col shrink-0 h-full shadow-2xl z-30 transition-all duration-300 relative border-r border-[#e05e00]">
         
-        <!-- Ações do Top Bar -->
-        <div class="flex items-center space-x-3">
-            <!-- Botão de Configurações -->
-            <button id="open-config-btn" onclick="openConfigModal()" class="flex items-center space-x-2 bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-brand-orange/50 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-300 hover:text-white transition shadow-sm">
-                <i class="fa-solid fa-gear text-brand-orange"></i>
-                <span>⚙ Configurações</span>
-            </button>
-
-            <!-- Status Online -->
-            <div class="flex items-center space-x-2 bg-zinc-900/80 border border-zinc-800 px-3 py-1 rounded-full text-[11px] font-medium text-zinc-300">
-                <span class="w-2 h-2 rounded-full bg-brand-orange animate-pulse"></span>
-                <span>Online</span>
+        <!-- Topo da Sidebar: Título e Botão de Novo Chat (Prancheta Tática) -->
+        <div class="p-4 border-b border-black/15 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-clipboard-list text-lg text-black"></i>
+                <span class="font-extrabold text-sm tracking-wide text-black uppercase">Pranchetas</span>
             </div>
-        </div>
-    </header>
 
-    <!-- Main Container com a Quadra no Fundo -->
-    <main id="main-container" class="flex-1 overflow-y-auto flex flex-col items-center p-4 relative court-bg">
-        
-        <!-- Badge de Sessão Centralizado -->
-        <div class="flex flex-col items-center mt-2 mb-6 z-10">
-            <div class="bg-zinc-900/90 border border-zinc-800/80 text-[10px] tracking-wider text-zinc-400 font-bold px-4 py-1.5 rounded-full uppercase shadow-lg">
-                COACH ESPECIALISTA IA • HOJE • SESSÃO DE ARREMESSO
-            </div>
-            <p class="text-[12px] text-zinc-400 mt-2 font-medium">Análise técnica e ajustes de precisão</p>
-        </div>
-
-        <!-- Container de Mensagens do Chat -->
-        <div id="chat-messages" class="w-full max-w-3xl space-y-6 pb-6 z-10 flex flex-col"></div>
-    </main>
-
-    <!-- Footer / Area de Input -->
-    <footer class="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 z-20">
-        <div class="relative bg-[#12151E] border border-[#1F2430] rounded-2xl shadow-2xl focus-within:border-brand-orange/70 transition-all p-2 flex items-center">
-            <textarea id="user-input" rows="1" placeholder="Digite sua mensagem..." class="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm px-4 py-2 focus:outline-none resize-none max-h-32" onkeydown="handleKeyPress(event)"></textarea>
-            <button onclick="sendMessage()" id="send-btn" class="w-10 h-10 rounded-xl bg-brand-orange text-black flex items-center justify-center hover:opacity-90 transition shrink-0 ml-2 font-bold shadow-md shadow-brand-orange/20">
-                <i class="fa-solid fa-arrow-up text-sm"></i>
+            <!-- Botão Novo Chat em formato de Prancheta de Basquete -->
+            <button id="btn-new-chat" onclick="createNewChat()" title="Novo chat" class="group relative w-10 h-11 bg-black text-[#FF6B00] rounded-lg border-2 border-black/80 flex flex-col items-center justify-center shadow-md hover:bg-zinc-900 hover:scale-105 active:scale-95 transition-all">
+                <!-- Clipe superior da prancheta -->
+                <span class="w-4 h-1.5 bg-[#FF6B00] rounded-t-sm -mt-1.5 mb-0.5"></span>
+                <!-- Desenho/Ícone de quadra / tática na prancheta -->
+                <i class="fa-solid fa-plus text-xs font-black"></i>
+                <i class="fa-solid fa-basketball text-[8px] mt-0.5"></i>
+                
+                <!-- Tooltip flutuante -->
+                <span class="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-black text-white text-[11px] font-bold rounded shadow-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50">
+                    Novo chat
+                </span>
             </button>
         </div>
-        <div class="flex items-center justify-between px-2 mt-2 text-[11px] text-zinc-500">
-            <span>Pressione Enter para enviar • Shift + Enter para quebra de linha</span>
-            <span class="flex items-center space-x-1 font-semibold text-zinc-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-brand-orange"></span>
-                <span>MOTOR TÁTICO CONECTADO</span>
+
+        <!-- Lista de Conversas Anteriores -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-1.5" id="conversations-list">
+            <!-- Conversas geradas dinamicamente via script.js -->
+        </div>
+
+        <!-- Rodapé da Barra Lateral -->
+        <div class="p-3 border-t border-black/15 flex items-center justify-between text-[11px] font-bold text-black/80">
+            <span class="flex items-center space-x-1.5">
+                <i class="fa-solid fa-database text-xs"></i>
+                <span>Histórico Salvo</span>
             </span>
+            <button onclick="clearAllChats()" title="Limpar conversas" class="text-black/60 hover:text-black p-1 transition">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
         </div>
-    </footer>
+    </aside>
 
-    <!-- Modal de Configurações -->
+    <!-- ============================================================== -->
+    <!-- ÁREA PRINCIPAL DA APLICAÇÃO -->
+    <!-- ============================================================== -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0B0D12]">
+        
+        <!-- Header / Top Bar -->
+        <header class="flex items-center justify-between px-6 py-3.5 border-b border-brand-cardBorder/50 bg-[#0B0D12]/90 backdrop-blur z-20 shrink-0">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-brand-orange flex items-center justify-center text-black font-bold text-lg shadow-lg shadow-brand-orange/20">
+                    <i class="fa-solid fa-basketball"></i>
+                </div>
+                <div>
+                    <div class="font-black text-lg tracking-wide text-white leading-tight">BasketCoach <span class="text-brand-orange">AI</span></div>
+                    <div class="text-[10px] tracking-widest text-zinc-400 font-semibold uppercase">COACH ASSISTENTE TÁTICO</div>
+                </div>
+            </div>
+            
+            <!-- Controles Superiores: Minigame, Configurações, Status -->
+            <div class="flex items-center space-x-2.5">
+                
+                <!-- Botão de Minigame (Controle de videogame) -->
+                <div class="relative group">
+                    <button id="btn-minigame" onclick="openMinigameModal()" title="Jogar basquete" class="w-9 h-9 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-brand-orange/70 text-zinc-300 hover:text-brand-orange flex items-center justify-center transition shadow-sm hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-gamepad text-sm"></i>
+                    </button>
+                    <!-- Tooltip do Minigame -->
+                    <span class="pointer-events-none absolute top-full mt-1.5 right-0 px-2 py-1 bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] font-semibold rounded shadow-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50">
+                        Jogar basquete
+                    </span>
+                </div>
+
+                <!-- Botão de Configurações -->
+                <button id="open-config-btn" onclick="openConfigModal()" class="flex items-center space-x-1.5 bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-brand-orange/50 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-300 hover:text-white transition shadow-sm">
+                    <i class="fa-solid fa-gear text-brand-orange"></i>
+                    <span class="hidden sm:inline">⚙ Configurações</span>
+                </button>
+
+                <!-- Status Online -->
+                <div class="flex items-center space-x-1.5 bg-zinc-900/80 border border-zinc-800 px-3 py-1.5 rounded-full text-[11px] font-medium text-zinc-300">
+                    <span class="w-2 h-2 rounded-full bg-brand-orange animate-pulse"></span>
+                    <span class="hidden sm:inline">Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Container com Quadra no Fundo (Largura ampliada) -->
+        <main id="main-container" class="flex-1 overflow-y-auto flex flex-col items-center p-4 relative court-bg">
+            
+            <!-- TELA INICIAL ELABORADA (Welcome Screen) -->
+            <div id="welcome-screen" class="w-full max-w-5xl my-auto py-8 px-4 flex flex-col items-center text-center z-10">
+                <!-- Badge Superior -->
+                <div class="inline-flex items-center space-x-2 bg-zinc-900/90 border border-zinc-800 px-4 py-1.5 rounded-full text-xs font-bold text-brand-orange mb-4 shadow-lg uppercase tracking-wider">
+                    <i class="fa-solid fa-fire"></i>
+                    <span>ALTA PERFORMANCE EM QUADRA</span>
+                </div>
+
+                <!-- Título de Destaque e Subtítulo -->
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight uppercase leading-none">
+                    ELEVE SEU <span class="text-brand-orange">JOGO</span>
+                </h1>
+                <p class="text-zinc-400 text-sm sm:text-base max-w-2xl mt-3 font-medium leading-relaxed">
+                    Seu treinador tático com inteligência artificial para dominar fundamentos, mecânica de arremesso, estratégias avançadas e mentalidade vencedora de basquete.
+                </p>
+
+                <!-- Ilustração estilizada de prancheta/quadra -->
+                <div class="mt-6 flex items-center justify-center space-x-3 text-zinc-500 text-xs">
+                    <span class="h-[1px] w-12 bg-zinc-800"></span>
+                    <span class="flex items-center space-x-1.5 text-zinc-400">
+                        <i class="fa-solid fa-arrows-split-up-and-left text-brand-orange"></i>
+                        <span>Escolha um plano de ação tático</span>
+                    </span>
+                    <span class="h-[1px] w-12 bg-zinc-800"></span>
+                </div>
+
+                <!-- Grid de Cards Interativos com Sugestões -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mt-6 text-left">
+                    
+                    <!-- Card 1 -->
+                    <button onclick="startPrompt('Como melhorar minha mecânica e consistência nos arremessos de 3 pontos?')" class="welcome-card group bg-[#12151E] hover:bg-[#161922] border border-[#1F2430] p-4 rounded-2xl flex items-start space-x-3.5 text-left transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-brand-orange/10 border border-brand-orange/30 group-hover:bg-brand-orange group-hover:text-black flex items-center justify-center text-brand-orange transition shrink-0">
+                            <i class="fa-solid fa-bullseye text-base"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-white font-bold text-sm group-hover:text-brand-orange transition">Melhorar arremessos de três pontos</h3>
+                            <p class="text-zinc-400 text-xs mt-1 leading-snug">Ajuste de base, alinhamento de cotovelo, release point e rotinas de repetição.</p>
+                        </div>
+                    </button>
+
+                    <!-- Card 2 -->
+                    <button onclick="startPrompt('Quais os melhores drills para aprimorar o controle de bola e drible sob pressão?')" class="welcome-card group bg-[#12151E] hover:bg-[#161922] border border-[#1F2430] p-4 rounded-2xl flex items-start space-x-3.5 text-left transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-brand-orange/10 border border-brand-orange/30 group-hover:bg-brand-orange group-hover:text-black flex items-center justify-center text-brand-orange transition shrink-0">
+                            <i class="fa-solid fa-bolt text-base"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-white font-bold text-sm group-hover:text-brand-orange transition">Aprimorar dribles e controle de bola</h3>
+                            <p class="text-zinc-400 text-xs mt-1 leading-snug">Drills de velocidade, crossover com hesitação e proteção contra marcação cerrada.</p>
+                        </div>
+                    </button>
+
+                    <!-- Card 3 -->
+                    <button onclick="startPrompt('Me ensine técnicas eficientes de finalização na bandeja e contato perto da cesta.')" class="welcome-card group bg-[#12151E] hover:bg-[#161922] border border-[#1F2430] p-4 rounded-2xl flex items-start space-x-3.5 text-left transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-brand-orange/10 border border-brand-orange/30 group-hover:bg-brand-orange group-hover:text-black flex items-center justify-center text-brand-orange transition shrink-0">
+                            <i class="fa-solid fa-angles-up text-base"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-white font-bold text-sm group-hover:text-brand-orange transition">Evoluir nas finalizações perto da cesta</h3>
+                            <p class="text-zinc-400 text-xs mt-1 leading-snug">Floater, eurostep, uso da tabela e absorção de contato físico com o marcador.</p>
+                        </div>
+                    </button>
+
+                    <!-- Card 4 -->
+                    <button onclick="startPrompt('Crie um plano de treinamento físico e técnico semanal personalizado para basquete.')" class="welcome-card group bg-[#12151E] hover:bg-[#161922] border border-[#1F2430] p-4 rounded-2xl flex items-start space-x-3.5 text-left transition-all">
+                        <div class="w-10 h-10 rounded-xl bg-brand-orange/10 border border-brand-orange/30 group-hover:bg-brand-orange group-hover:text-black flex items-center justify-center text-brand-orange transition shrink-0">
+                            <i class="fa-solid fa-calendar-check text-base"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-white font-bold text-sm group-hover:text-brand-orange transition">Plano de treino personalizado</h3>
+                            <p class="text-zinc-400 text-xs mt-1 leading-snug">Periodização semanal integrando resistência cardiovascular, pliometria e fundamentos.</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sessão de Mensagens do Chat (Oculta inicialmente até haver conversa) -->
+            <div id="chat-messages-container" class="w-full max-w-5xl space-y-6 pb-6 z-10 flex flex-col hidden">
+                <!-- Badge de Sessão Centralizado -->
+                <div class="flex flex-col items-center mt-2 mb-2 z-10">
+                    <div class="bg-zinc-900/90 border border-zinc-800/80 text-[10px] tracking-wider text-zinc-400 font-bold px-4 py-1.5 rounded-full uppercase shadow-lg">
+                        COACH ESPECIALISTA IA • TÁTICA & PERFORMANCE
+                    </div>
+                </div>
+
+                <!-- Lista de Balões de Mensagem -->
+                <div id="chat-messages" class="w-full space-y-5"></div>
+            </div>
+        </main>
+
+        <!-- Footer / Input de Mensagem (Largura ampliada compatível) -->
+        <footer class="w-full max-w-5xl mx-auto px-4 pb-4 pt-2 z-20 shrink-0">
+            <div class="relative bg-[#12151E] border border-[#1F2430] rounded-2xl shadow-2xl focus-within:border-brand-orange/70 transition-all p-2 flex items-center">
+                <textarea id="user-input" rows="1" placeholder="Digite sua dúvida ou jogada tática..." class="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm px-4 py-2 focus:outline-none resize-none max-h-32" onkeydown="handleKeyPress(event)"></textarea>
+                <button onclick="sendMessage()" id="send-btn" class="w-10 h-10 rounded-xl bg-brand-orange text-black flex items-center justify-center hover:opacity-90 transition shrink-0 ml-2 font-bold shadow-md shadow-brand-orange/20">
+                    <i class="fa-solid fa-arrow-up text-sm"></i>
+                </button>
+            </div>
+            <div class="flex items-center justify-between px-2 mt-2 text-[11px] text-zinc-500">
+                <span>Pressione Enter para enviar • Shift + Enter para quebra de linha</span>
+                <span class="flex items-center space-x-1 font-semibold text-zinc-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-brand-orange"></span>
+                    <span>MOTOR TÁTICO CONECTADO</span>
+                </span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL DE CONFIGURAÇÕES DA API AZURE OPENAI -->
+    <!-- ============================================================== -->
     <div id="config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4">
         <div class="bg-[#12151E] border border-[#1F2430] w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-zinc-100">
             <!-- Cabeçalho do Modal -->
@@ -105,7 +246,6 @@
                         <p class="text-[11px] text-zinc-400">Azure OpenAI Service</p>
                     </div>
                 </div>
-                <!-- Botão de Fechar Modal -->
                 <button onclick="closeConfigModal()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition flex items-center justify-center">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
@@ -113,7 +253,6 @@
 
             <!-- Formulário -->
             <form id="config-form" onsubmit="handleSaveConfig(event)" class="mt-5 space-y-4">
-                <!-- Chave da API -->
                 <div class="space-y-1.5">
                     <label for="modal-api-key" class="block text-xs font-semibold text-zinc-300">
                         Chave da API <span class="text-brand-orange">*</span>
@@ -121,7 +260,6 @@
                     <input type="password" id="modal-api-key" placeholder="Digite sua Chave da API da Azure" autocomplete="off" class="w-full bg-[#161922] border border-[#1F2430] rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-orange transition">
                 </div>
 
-                <!-- Endpoint da Azure -->
                 <div class="space-y-1.5">
                     <label for="modal-endpoint" class="block text-xs font-semibold text-zinc-300">
                         Endpoint da Azure <span class="text-brand-orange">*</span>
@@ -129,7 +267,6 @@
                     <input type="text" id="modal-endpoint" placeholder="https://seu-recurso.openai.azure.com/openai/deployments/..." autocomplete="off" class="w-full bg-[#161922] border border-[#1F2430] rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-orange transition">
                 </div>
 
-                <!-- Modelo -->
                 <div class="space-y-1.5">
                     <label for="modal-model" class="block text-xs font-semibold text-zinc-300">
                         Modelo <span class="text-brand-orange">*</span>
@@ -137,10 +274,8 @@
                     <input type="text" id="modal-model" placeholder="Ex: gpt-4.1-mini" autocomplete="off" class="w-full bg-[#161922] border border-[#1F2430] rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-brand-orange transition">
                 </div>
 
-                <!-- Mensagens de Alerta/Status no Modal -->
                 <div id="modal-feedback" class="text-xs font-medium py-1 hidden"></div>
 
-                <!-- Botões de Ação -->
                 <div class="flex items-center justify-end space-x-3 pt-3 border-t border-[#1F2430]">
                     <button type="button" onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition">
                         Cancelar
@@ -150,6 +285,96 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL DO MINIGAME DE ARREMESSO DE BASQUETE -->
+    <!-- ============================================================== -->
+    <div id="minigame-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md hidden p-3">
+        <div class="bg-[#12151E] border border-[#1F2430] w-full max-w-2xl rounded-2xl p-5 shadow-2xl relative text-zinc-100 flex flex-col">
+            
+            <!-- Topo do Minigame -->
+            <div class="flex items-center justify-between pb-3 border-b border-[#1F2430]">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-brand-orange/15 border border-brand-orange/30 flex items-center justify-center text-brand-orange text-sm">
+                        <i class="fa-solid fa-gamepad"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-black text-base text-white tracking-wide">DESAFIO DO ARREMESSO</h2>
+                        <p class="text-[11px] text-zinc-400">Arraste a bola para trás e solte para arremessar na cesta!</p>
+                    </div>
+                </div>
+
+                <button onclick="closeMinigameModal()" class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Placar Superior do Jogo -->
+            <div class="flex items-center justify-between bg-zinc-950/70 border border-[#1F2430] rounded-xl px-4 py-2 mt-3 text-xs">
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-zinc-400">Pontos:</span>
+                    <span id="game-score" class="font-black text-brand-orange text-base">0</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-zinc-400">Cestas:</span>
+                    <span id="game-baskets" class="font-bold text-white text-sm">0/10</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-zinc-400">Arremessos restantes:</span>
+                    <span id="game-shots-left" class="font-bold text-white text-sm">10</span>
+                </div>
+                <button onclick="resetGame()" class="text-[11px] text-zinc-400 hover:text-brand-orange flex items-center space-x-1 transition">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>Reiniciar</span>
+                </button>
+            </div>
+
+            <!-- Canvas da Quadra de Basquete -->
+            <div class="relative w-full aspect-[16/9] mt-3 rounded-xl overflow-hidden border border-[#1F2430] bg-[#08090D]">
+                <canvas id="basketball-canvas" width="640" height="360" class="w-full h-full block"></canvas>
+                
+                <!-- Feedback visual de Cesta (Pop-up) -->
+                <div id="game-feedback-text" class="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300">
+                    <span class="font-black text-3xl sm:text-4xl text-brand-orange tracking-widest drop-shadow-[0_4px_12px_rgba(255,107,0,0.8)] scale-110">CESTA! +2</span>
+                </div>
+
+                <!-- Overlay de Fim de Partida -->
+                <div id="game-over-screen" class="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center hidden">
+                    <div class="w-14 h-14 rounded-2xl bg-brand-orange/15 border border-brand-orange flex items-center justify-center text-brand-orange text-2xl mb-3">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-white uppercase">Fim de Treino!</h3>
+                    <p class="text-zinc-400 text-xs mt-1">Veja seus números finais na quadra:</p>
+                    
+                    <div class="grid grid-cols-3 gap-3 my-4 w-full max-w-sm">
+                        <div class="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
+                            <span class="block text-[10px] text-zinc-400 uppercase font-bold">Pontuação</span>
+                            <span id="game-final-score" class="font-black text-lg text-brand-orange">0</span>
+                        </div>
+                        <div class="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
+                            <span class="block text-[10px] text-zinc-400 uppercase font-bold">Cestas</span>
+                            <span id="game-final-baskets" class="font-black text-lg text-white">0</span>
+                        </div>
+                        <div class="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
+                            <span class="block text-[10px] text-zinc-400 uppercase font-bold">Aproveitamento</span>
+                            <span id="game-final-acc" class="font-black text-lg text-green-400">0%</span>
+                        </div>
+                    </div>
+
+                    <button onclick="resetGame()" class="px-6 py-2.5 rounded-xl text-xs font-black bg-brand-orange text-black hover:opacity-90 transition shadow-lg shadow-brand-orange/30 flex items-center space-x-2">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>JOGAR NOVAMENTE</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rodapé com Instruções de Controle -->
+            <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-3 pt-2 border-t border-[#1F2430]">
+                <span><i class="fa-solid fa-hand-pointer text-brand-orange mr-1"></i> Arraste a bola para trás e para cima para mirar e dar força.</span>
+                <span class="text-zinc-500">Tecla ESC fecha o jogo</span>
+            </div>
         </div>
     </div>
 
