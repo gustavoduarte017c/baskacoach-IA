@@ -128,17 +128,18 @@ function renderConversationsList() {
     conversations.forEach(chat => {
         const isActive = chat.id === currentChatId;
         const item = document.createElement('div');
-        item.className = `group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
+        item.className = `group flex items-center justify-between px-2.5 py-2 rounded-xl cursor-pointer transition-all ${
             isActive 
-                ? 'bg-black text-[#FF6B00] font-black shadow-md scale-[1.02]' 
+                ? 'bg-black text-[#FF6B00] font-black shadow-md scale-[1.01]' 
                 : 'text-black/85 hover:bg-black/10 font-bold'
         }`;
         item.onclick = () => selectChat(chat.id);
 
+        const safeTitle = escapeHtml(chat.title || 'Prancheta');
         item.innerHTML = `
-            <div class="flex items-center space-x-2.5 overflow-hidden flex-1 mr-2">
-                <i class="fa-solid fa-clipboard text-xs shrink-0 ${isActive ? 'text-[#FF6B00]' : 'text-black/60'}"></i>
-                <span class="text-xs truncate tracking-tight">${escapeHtml(chat.title || 'Prancheta')}</span>
+            <div class="flex items-center space-x-2 overflow-hidden flex-1 mr-1 min-w-0" title="${safeTitle}">
+                <i class="fa-solid fa-clipboard text-[11px] shrink-0 ${isActive ? 'text-[#FF6B00]' : 'text-black/60'}"></i>
+                <span class="text-[11px] truncate tracking-tight font-bold max-w-[170px] block leading-tight">${safeTitle}</span>
             </div>
             <button onclick="deleteChat('${chat.id}', event)" title="Excluir" class="opacity-0 group-hover:opacity-100 hover:text-red-600 transition p-1 shrink-0 ${isActive ? 'text-zinc-400 hover:text-red-400' : 'text-black/60'}">
                 <i class="fa-solid fa-xmark text-xs"></i>
@@ -351,6 +352,203 @@ function handleSaveConfig(event) {
 }
 
 // =========================================================================
+// =========================================================================
+// AGENTE GERADOR DE TÍTULOS PARA O HISTÓRICO DE PRANCHETAS
+// =========================================================================
+
+/**
+ * Sanitiza e formata o título gerado segundo as regras do projeto:
+ * - Curto (2 a 6 palavras)
+ * - Sem aspas, pontuação final, prefixos ou explicações
+ * - Primeira letra maiúscula
+ */
+function sanitizeConversationTitle(rawTitle) {
+    if (!rawTitle || typeof rawTitle !== 'string') return '';
+
+    let cleaned = rawTitle
+        .replace(/[\"'\`\*_#~]/g, '')
+        .replace(/^(?:t[ií]tulo|assunto|tema|conversa|chat|prancheta)\s*:\s*/i, '')
+        .replace(/^[\s\-\–\—\:\.]+/g, '')
+        .replace(/[\.\?!,:;]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // Lista de termos genéricos que devem ser evitados
+    const generic = ['nova conversa', 'novo chat', 'conversa', 'chat', 'mensagem', 'prancheta'];
+    if (generic.includes(cleaned.toLowerCase())) {
+        return '';
+    }
+
+    const words = cleaned.split(' ').filter(w => w.length > 0);
+    if (words.length > 6) {
+        cleaned = words.slice(0, 6).join(' ');
+    } else if (words.length < 1) {
+        return '';
+    }
+
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
+ * Fallback inteligente e determinístico caso a API esteja indisponível.
+ * Extrai o assunto central em 2 a 5 palavras.
+ */
+function generateFallbackTitle(firstMessage) {
+    if (!firstMessage) return 'Prancheta Tática';
+
+    let text = firstMessage
+        .replace(/[\"'\`\*_#~]/g, '')
+        .replace(/^(?:como|como faço para|eu quero|quero|gostaria de saber como|gostaria de|preciso de|preciso|me ensine|me ajuda a|ajuda com|crie um|qual o|quais os|dicas para|como montar)\s+/i, '')
+        .replace(/[\.\?!,:;]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const words = text.split(' ').filter(w => w.length > 0);
+    const selected = words.slice(0, 5).join(' ');
+    const title = sanitizeConversationTitle(selected);
+    return title || 'Prancheta Tática';
+}
+
+/**
+ * Função central para extrair o texto de respostas da OpenAI,
+ * compatível tanto com a Responses API (output_text / output[]) quanto
+ * com o formato legado Chat Completions (choices[0].message.content).
+ */
+function extractAIResponseText(data) {
+    if (!data) return '';
+
+    // 1. Atalho direto da Responses API
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+        return data.output_text.trim();
+    }
+
+    // 2. Estrutura de array typed output da Responses API
+    if (Array.isArray(data.output)) {
+        const parts = [];
+        for (const item of data.output) {
+            if (!item || typeof item !== 'object') continue;
+            if (typeof item.text === 'string' && item.text.trim()) {
+                parts.push(item.text.trim());
+            } else if (Array.isArray(item.content)) {
+                for (const part of item.content) {
+                    if (part && typeof part.text === 'string' && part.text.trim()) {
+                        parts.push(part.text.trim());
+                    }
+                }
+            }
+        }
+        if (parts.length > 0) return parts.join('\n\n');
+    }
+
+    // 3. Fallback para formato choices (Chat Completions)
+    if (Array.isArray(data.choices) && data.choices[0]) {
+        const choice = data.choices[0];
+        if (choice.message && typeof choice.message.content === 'string') {
+            return choice.message.content.trim();
+        }
+        if (typeof choice.text === 'string') {
+            return choice.text.trim();
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Função central responsável por fazer requisições à IA compatíveis
+ * com a Responses API (OpenAI / Azure OpenAI Responses).
+ * 
+ * - Envia o parâmetro obrigatório 'input' em vez de 'messages'
+ * - Mantém todo o histórico e contexto da conversa intacto
+ * - Suporta instruções de sistema (system prompt)
+ * - Suporta 'max_output_tokens' em vez de parâmetros legados
+ * - Trata a resposta retornando o texto limpo gerado pela IA
+ */
+async function callOpenAIResponseAPI({ input, instructions = null, maxOutputTokens = 4096, temperature = null }) {
+    if (!isConfigValid(azureConfig)) {
+        throw new Error("Azure OpenAI não configurada");
+    }
+
+    // Monta o payload conforme a especificação da Responses API
+    const payload = {
+        model: azureConfig.model,
+        input: input
+    };
+
+    if (instructions && typeof instructions === 'string' && instructions.trim()) {
+        payload.instructions = instructions.trim();
+    }
+
+    if (typeof maxOutputTokens === 'number' && maxOutputTokens > 0) {
+        payload.max_output_tokens = maxOutputTokens;
+    }
+
+    if (typeof temperature === 'number') {
+        payload.temperature = temperature;
+    }
+
+    const response = await fetch(azureConfig.endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${azureConfig.apiKey}`,
+            'api-key': azureConfig.apiKey
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errBody}`);
+    }
+
+    const data = await response.json();
+    const extractedText = extractAIResponseText(data);
+    return extractedText || "Resposta vazia retornada pela API.";
+}
+
+async function generateConversationTitleAgent(chatId, firstMessage) {
+    if (!firstMessage || !chatId) return;
+
+    const titleInstructions = "Você é um agente especializado em criar títulos curtos e precisos para o histórico lateral de conversas de um app de basquete. Analise o tema principal da primeira mensagem do usuário e gere um título de 2 a 6 palavras.\n\nREGRAS OBRIGATÓRIAS:\n- Retorne APENAS o título puro, sem aspas, sem ponto final e sem nenhuma palavra adicional.\n- Não copie a mensagem inteira.\n- Não inclua explicações ou saudações.\n- Não use títulos genéricos como 'Nova conversa' ou 'Chat'.\n- Priorize aproximadamente 2 a 6 palavras.\n\nExemplos:\nUsuário: Quero melhorar meu arremesso de três pontos no basquete.\nTítulo: Arremesso de 3 pontos\n\nUsuário: Quero criar um sistema de login para meu aplicativo.\nTítulo: Sistema de login\n\nUsuário: Como faço para melhorar meu carro?\nTítulo: Projeto do carro";
+
+    try {
+        const rawTitle = await callOpenAIResponseAPI({
+            input: [
+                {
+                    role: "user",
+                    content: firstMessage
+                }
+            ],
+            instructions: titleInstructions,
+            maxOutputTokens: 50,
+            temperature: 0.3
+        });
+
+        const cleanTitle = sanitizeConversationTitle(rawTitle);
+
+        if (cleanTitle) {
+            applyTitleToConversation(chatId, cleanTitle);
+            return;
+        }
+        throw new Error("Título retornado vazio ou inválido");
+
+    } catch (err) {
+        console.warn("[Agente de Título] Usando fallback local para o título:", err.message);
+        const fallbackTitle = generateFallbackTitle(firstMessage);
+        applyTitleToConversation(chatId, fallbackTitle);
+    }
+}
+
+function applyTitleToConversation(chatId, title) {
+    const chat = conversations.find(c => c.id === chatId);
+    if (chat) {
+        chat.title = title;
+        saveConversationsToStorage();
+        renderConversationsList();
+    }
+}
+
 // ENVIO DE MENSAGENS E INTEGRAÇÃO AZURE OPENAI
 // =========================================================================
 
@@ -380,11 +578,17 @@ async function sendMessage() {
 
     const chat = getCurrentChat();
 
-    // Se a conversa ainda estiver vazia, cria título a partir dos primeiros caracteres
-    if (chat.history.filter(m => m.role !== 'system').length === 0) {
-        const cleanTitle = text.length > 28 ? text.substring(0, 28) + '...' : text;
-        chat.title = cleanTitle;
+    // Se for a primeira mensagem desta conversa, aciona o Agente Gerador de Título
+    const isFirstUserMessage = chat.history.filter(m => m.role !== 'system').length === 0;
+    if (isFirstUserMessage) {
+        // Título provisório imediato baseado nas primeiras palavras para feedback ágil na UI
+        const tempTitle = generateFallbackTitle(text);
+        chat.title = tempTitle;
         renderConversationsList();
+        saveConversationsToStorage();
+
+        // Aciona o Agente de IA para analisar e refinar o título definitivo
+        generateConversationTitleAgent(chat.id, text);
     }
 
     // Oculta a tela inicial e exibe o container do chat
@@ -406,40 +610,33 @@ async function sendMessage() {
     appendLoadingMessageToDOM(loadingId);
 
     try {
-        // Envia apenas o formato { role, content } esperado pela API
-        const payloadMessages = chat.history.map(m => ({ role: m.role, content: m.content }));
+        // Separa as instruções de sistema do histórico de mensagens para a Responses API
+        let systemInstructions = "";
+        const inputHistory = [];
 
-        const response = await fetch(azureConfig.endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${azureConfig.apiKey}`,
-                'api-key': azureConfig.apiKey
-            },
-            body: JSON.stringify({
-                messages: payloadMessages,
-                max_completion_tokens: 13107,
-                temperature: 1,
-                top_p: 1,
-                frequency_penalty: 0,
-                presence_penalty: 0,
-                stop: [],
-                model: azureConfig.model
-            })
+        chat.history.forEach(m => {
+            if (m.role === 'system') {
+                systemInstructions = systemInstructions 
+                    ? systemInstructions + "\n" + m.content 
+                    : m.content;
+            } else {
+                inputHistory.push({
+                    role: m.role,
+                    content: m.content
+                });
+            }
+        });
+
+        // Chama a função central compatível com a Responses API
+        const assistantReply = await callOpenAIResponseAPI({
+            input: inputHistory,
+            instructions: systemInstructions || SYSTEM_PROMPT.content,
+            maxOutputTokens: 4096,
+            temperature: 0.7
         });
 
         const loadingElement = document.getElementById(loadingId);
         if (loadingElement) loadingElement.remove();
-
-        if (!response.ok) {
-            const errBody = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errBody}`);
-        }
-
-        const data = await response.json();
-        const assistantReply = data.choices && data.choices[0] && data.choices[0].message 
-            ? data.choices[0].message.content 
-            : "Resposta vazia retornada pela API.";
 
         const replyTime = getCurrentTime();
         appendAssistantMessageToDOM(assistantReply, replyTime);
@@ -582,7 +779,8 @@ const gameState = {
         vy: 0,
         radius: 14,
         isFlying: false,
-        hasScored: false
+        hasScored: false,
+        passedRimEntry: false
     },
     hoop: {
         backboardX: 535,
@@ -644,6 +842,7 @@ function resetBallPosition() {
     gameState.ball.vy = 0;
     gameState.ball.isFlying = false;
     gameState.ball.hasScored = false;
+    gameState.ball.passedRimEntry = false;
 }
 
 function initCanvasGame() {
@@ -700,6 +899,9 @@ function handleMouseMove(e) {
     const canvas = document.getElementById('basketball-canvas');
     if (!canvas) return;
     const coords = getCanvasCoords(canvas, e.clientX, e.clientY);
+    const r = gameState.ball.radius;
+    coords.x = Math.max(r, Math.min(canvas.width - r, coords.x));
+    coords.y = Math.max(r, Math.min(canvas.height - 20 - r, coords.y));
     gameState.dragCurrent = coords;
 }
 
@@ -740,6 +942,7 @@ function launchBall() {
     gameState.ball.vy = dy * forceMultiplier;
     gameState.ball.isFlying = true;
     gameState.ball.hasScored = false;
+    gameState.ball.passedRimEntry = false;
 
     gameState.shotsRemaining--;
     const shotsLeftEl = document.getElementById('game-shots-left');
@@ -778,19 +981,153 @@ function updatePhysics(canvas) {
     const hoop = gameState.hoop;
     if (!b.isFlying) return;
 
-    // Gravidade e atrito do ar
+    // Guarda posição anterior da bola para checagem de trajetória contínua
+    const prevX = b.x;
+    const prevY = b.y;
+
+    // Gravidade e atrito
     b.vy += 0.38;
     b.x += b.vx;
     b.y += b.vy;
 
-    // Colisão com o chão
-    if (b.y + b.radius >= canvas.height - 20) {
-        b.y = canvas.height - 20 - b.radius;
+    // Dimensões do aro e tabela
+    const backboardLeft = hoop.backboardX;
+    const backboardRight = hoop.backboardX + hoop.backboardW;
+    const backboardTop = hoop.backboardY;
+    const backboardBottom = hoop.backboardY + hoop.backboardH;
+
+    const rimLeftX = hoop.rimX;
+    const rimRightX = hoop.rimX + hoop.rimW;
+    const rimY = hoop.rimY;
+    const rimThickness = 4;
+
+    // --- COLISÃO COM A TABELA (Backboard) ---
+    if (
+        b.x + b.radius >= backboardLeft &&
+        b.x - b.radius <= backboardRight &&
+        b.y + b.radius >= backboardTop &&
+        b.y - b.radius <= backboardBottom
+    ) {
+        if (prevX + b.radius <= backboardLeft) {
+            b.x = backboardLeft - b.radius;
+            b.vx = -Math.abs(b.vx) * 0.65;
+        } else if (prevX - b.radius >= backboardRight) {
+            b.x = backboardRight + b.radius;
+            b.vx = Math.abs(b.vx) * 0.65;
+        } else if (prevY + b.radius <= backboardTop) {
+            b.y = backboardTop - b.radius;
+            b.vy = -Math.abs(b.vy) * 0.6;
+        } else {
+            b.x = backboardLeft - b.radius;
+            b.vx = -Math.abs(b.vx) * 0.65;
+        }
+    }
+
+    // --- COLISÃO FÍSICA COM OS PONTOS DO ARO (Aro dianteiro e traseiro) ---
+    // Ponto frontal esquerdo do aro
+    const dFront = Math.hypot(b.x - rimLeftX, b.y - rimY);
+    if (dFront < b.radius + rimThickness) {
+        const nx = (b.x - rimLeftX) / (dFront || 1);
+        const ny = (b.y - rimY) / (dFront || 1);
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0) {
+            b.vx = (b.vx - 1.6 * dot * nx) * 0.65;
+            b.vy = (b.vy - 1.6 * dot * ny) * 0.65;
+        }
+        b.x = rimLeftX + nx * (b.radius + rimThickness);
+        b.y = rimY + ny * (b.radius + rimThickness);
+    }
+
+    // Ponto traseiro direito do aro
+    const dBack = Math.hypot(b.x - rimRightX, b.y - rimY);
+    if (dBack < b.radius + rimThickness) {
+        const nx = (b.x - rimRightX) / (dBack || 1);
+        const ny = (b.y - rimY) / (dBack || 1);
+        const dot = b.vx * nx + b.vy * ny;
+        if (dot < 0) {
+            b.vx = (b.vx - 1.6 * dot * nx) * 0.65;
+            b.vy = (b.vy - 1.6 * dot * ny) * 0.65;
+        }
+        b.x = rimRightX + nx * (b.radius + rimThickness);
+        b.y = rimY + ny * (b.radius + rimThickness);
+    }
+
+    // --- DETECÇÃO RIGOROSA DE CESTA (Área interna invisível de entrada e validação) ---
+    // A cesta só é pontuada se a bola:
+    // 1. Estiver em queda descendente (b.vy > 0);
+    // 2. Estiver entre as extremidades do aro (espaço interno real);
+    // 3. Cruzar primeiro o plano superior de entrada da cesta (rimY);
+    // 4. Em seguida descer pela área interna da rede (rimY + 6 até rimY + 26);
+    // 5. Pontuar exatamente 1 ponto apenas uma vez por jogada.
+    const rimInnerLeft = rimLeftX + 5;
+    const rimInnerRight = rimRightX - 5;
+
+    if (!b.hasScored && b.vy > 0) {
+        // Passo 1: Bola cruza de cima para baixo o topo interno do aro
+        if (b.x >= rimInnerLeft && b.x <= rimInnerRight) {
+            if (prevY <= rimY && b.y >= rimY) {
+                b.passedRimEntry = true;
+            }
+        }
+
+        // Passo 2: Bola confirma travessia pelo espaço interno da cesta
+        if (
+            b.passedRimEntry &&
+            b.x >= rimInnerLeft &&
+            b.x <= rimInnerRight &&
+            b.y >= rimY + 6 &&
+            b.y <= rimY + 26
+        ) {
+            b.hasScored = true;
+            b.passedRimEntry = false;
+            gameState.score += 1; // Exatamente 1 ponto por cesta convertida
+            gameState.baskets += 1;
+
+            const scoreEl = document.getElementById('game-score');
+            const basketsEl = document.getElementById('game-baskets');
+            if (scoreEl) scoreEl.textContent = gameState.score;
+            if (basketsEl) basketsEl.textContent = `${gameState.baskets}/${gameState.totalShots}`;
+
+            // Amortecimento suave na rede
+            b.vx *= 0.6;
+            b.vy *= 0.75;
+
+            triggerBasketFeedback();
+        }
+    }
+
+    // Se a bola sair da coluna da cesta ou passar do fundo sem validar, reseta a entrada
+    if (b.y > rimY + 35 || b.x < rimLeftX - 10 || b.x > rimRightX + 10) {
+        b.passedRimEntry = false;
+    }
+
+    // --- LIMITES INTERNOS DO MODAL / CANVAS (A bola permanece 100% contida dentro do modal) ---
+    const floorY = canvas.height - 20;
+
+    // Parede esquerda
+    if (b.x - b.radius <= 0) {
+        b.x = b.radius;
+        b.vx = -b.vx * 0.6;
+    }
+    // Parede direita
+    if (b.x + b.radius >= canvas.width) {
+        b.x = canvas.width - b.radius;
+        b.vx = -b.vx * 0.6;
+    }
+    // Teto superior do modal
+    if (b.y - b.radius <= 0) {
+        b.y = b.radius;
+        b.vy = -b.vy * 0.55;
+    }
+    // Chão da quadra
+    if (b.y + b.radius >= floorY) {
+        b.y = floorY - b.radius;
         b.vy = -b.vy * 0.55;
         b.vx *= 0.7;
 
         // Se a velocidade for muito baixa após tocar o chão, reinicia a bola
         if (Math.abs(b.vy) < 1.2 && Math.abs(b.vx) < 1) {
+            b.isFlying = false;
             setTimeout(() => {
                 if (gameState.shotsRemaining > 0) {
                     resetBallPosition();
@@ -798,60 +1135,7 @@ function updatePhysics(canvas) {
                     showGameOver();
                 }
             }, 300);
-            b.isFlying = false;
         }
-    }
-
-    // Colisão com as paredes laterais
-    if (b.x - b.radius <= 0) {
-        b.x = b.radius;
-        b.vx = -b.vx * 0.6;
-    }
-    if (b.x + b.radius >= canvas.width) {
-        b.x = canvas.width - b.radius;
-        b.vx = -b.vx * 0.6;
-    }
-
-    // Colisão com a Tabela (Backboard)
-    if (
-        b.x + b.radius >= hoop.backboardX &&
-        b.x - b.radius <= hoop.backboardX + hoop.backboardW &&
-        b.y >= hoop.backboardY &&
-        b.y <= hoop.backboardY + hoop.backboardH
-    ) {
-        b.x = hoop.backboardX - b.radius;
-        b.vx = -b.vx * 0.65;
-    }
-
-    // Colisão com a borda frontal do aro (Aro esquerdo)
-    const frontRimDist = Math.hypot(b.x - hoop.rimX, b.y - hoop.rimY);
-    if (frontRimDist < b.radius + 3) {
-        b.vx = -b.vx * 0.6;
-        b.vy = -b.vy * 0.6;
-    }
-
-    // Detecção de Cesta Válida:
-    // Bola passando descendo (vy > 0) entre as coordenadas do aro
-    const rimLeft = hoop.rimX + 4;
-    const rimRight = hoop.rimX + hoop.rimW - 4;
-    if (
-        !b.hasScored &&
-        b.vy > 0 &&
-        b.x > rimLeft &&
-        b.x < rimRight &&
-        b.y >= hoop.rimY - 2 &&
-        b.y <= hoop.rimY + 14
-    ) {
-        b.hasScored = true;
-        gameState.score += 2;
-        gameState.baskets += 1;
-
-        const scoreEl = document.getElementById('game-score');
-        const basketsEl = document.getElementById('game-baskets');
-        if (scoreEl) scoreEl.textContent = gameState.score;
-        if (basketsEl) basketsEl.textContent = `${gameState.baskets}/${gameState.totalShots}`;
-
-        triggerBasketFeedback();
     }
 }
 

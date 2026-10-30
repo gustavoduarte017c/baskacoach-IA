@@ -11,8 +11,10 @@ A aplicação foi projetada com um design moderno em modo escuro total (`#000000
 * **Especialização Estrita (Apenas Basquete):** A inteligência artificial é configurada com um perfil rigoroso para recusar qualquer assunto fora do universo do basquete, mantendo o foco total no desempenho do atleta.
 * **Perfil de Treinador Implacável:** Comportamento focado em alta performance, disciplina e superação física/mental.
 * **Sem Markdown:** Respostas limpas em texto puro, sem formatações indesejadas (como asteriscos ou hashtags), proporcionando uma leitura fluida e natural no chat.
-* **Barra Lateral com Histórico de Conversas (Pranchetas):**
+* **Barra Lateral com Histórico de Conversas (Pranchetas) e Agente Gerador de Títulos:**
   * Fundo laranja oficial (`#FF6B00`) com tipografia preta em alto contraste.
+  * **Agente IA de Títulos Automáticos:** analisa unicamente a primeira mensagem de cada conversa e gera um título curto (2 a 6 palavras), objetivo e contextualmente representativo para o histórico lateral.
+  * Título persistente salvo na conversa, sem alterações automáticas nas mensagens subsequentes.
   * Botão de **Novo Chat** com formato estilizado de **prancheta tática de basquete** e tooltip interativo.
   * Persistência completa no `localStorage` sob a chave `basketcoach_conversations`.
   * Estados visuais para conversa ativa, hover e opção de exclusão.
@@ -26,8 +28,10 @@ A aplicação foi projetada com um design moderno em modo escuro total (`#000000
 * **Minigame Interativo "Desafio do Arremesso":**
   * Botão discreto em formato de controle de videogame (`fa-gamepad`) no cabeçalho com tooltip "Jogar basquete".
   * Modal interativo com motor físico em HTML5 Canvas: mira elástica (arrastar e soltar), gravidade, tabelas de acrílico e aro.
-  * Sistema completo de 10 arremessos por rodada, 2 pontos por cesta, feedback "CESTA! +2", tela de fim de jogo com estatísticas de aproveitamento e botão para jogar novamente.
-* **Integração com Azure OpenAI:** Suporte completo aos parâmetros de requisição (`max_completion_tokens`, `temperature`, `model`, etc.) e tratamento robusto de erros.
+  * **Limite Visual Estrito da Bola:** a bola é confinada perfeitamente no limite interno do modal, considerando seu raio (14px), sem ultrapassar as bordas laterais, teto ou chão.
+  * **Sistema Rigoroso de Pontuação (1 Ponto por Cesta Convertida):** validação em duas etapas com colisão física nos aros e verificação de trajetória descendente pelo espaço interno real da cesta; toques no aro ou passagens externas não pontuam.
+  * Sistema completo de 10 arremessos por rodada, 1 ponto por cesta convertida, feedback visual dinâmico "CESTA! +1", tela de fim de treino com estatísticas de aproveitamento e botão para jogar novamente.
+* **Integração com Azure OpenAI / Responses API:** Suporte nativo ao formato da Responses API utilizando o parâmetro `input` (com histórico conversacional preservado), instruções de sistema (`instructions`), limite de saída (`max_output_tokens`), suporte a `output_text`/`output[]` e tratamento robusto de erros.
 * **Gerenciamento Dinâmico de Credenciais:** Configuração de credenciais via arquivo `env.json` ou diretamente pela interface através de modal interativo.
 
 ---
